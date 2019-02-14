@@ -53,7 +53,7 @@ case class JdbcBatchDataConnector(@transient sparkSession: SparkSession,
       val prop = new Properties()
       prop.put("user", user)
       prop.put("password", password)
-      val df = sparkSession.read.jdbc(jdbcUrl, tableName, prop)
+      val df = sparkSession.read.jdbc(jdbcUrl, concreteTableName, prop)
       val dfOpt = Some(df)
       val preDfOpt = preProcess(dfOpt, ms)
       preDfOpt
