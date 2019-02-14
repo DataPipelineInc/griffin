@@ -19,49 +19,51 @@ under the License.
 package org.apache.griffin.measure.datasource.connector.batch
 
 import java.util.Properties
+
+import org.apache.spark.sql.{DataFrame, SparkSession}
+
 import org.apache.griffin.measure.configuration.dqdefinition.DataConnectorParam
 import org.apache.griffin.measure.context.TimeRange
 import org.apache.griffin.measure.datasource.TimestampStorage
 import org.apache.griffin.measure.utils.ParamUtil._
-import org.apache.spark.sql.{DataFrame, SparkSession}
 
 case class JdbcBatchDataConnector(@transient sparkSession: SparkSession,
                                   dcParam: DataConnectorParam,
                                   timestampStorage: TimestampStorage
                                  ) extends BatchDataConnector {
 
-    val config = dcParam.getConfig
+  val config = dcParam.getConfig
 
-    val Database = "database"
-    val TableName = "table.name"
-    val JdbcUrl = "jdbc.url"
-    val User = "jdbc.user"
-    val Password = "jdbc.password"
+  val Database = "database"
+  val TableName = "table.name"
+  val JdbcUrl = "jdbc.url"
+  val User = "jdbc.user"
+  val Password = "jdbc.password"
 
-    val database = config.getString(Database, "")
-    val tableName = config.getString(TableName, "")
-    val jdbcUrl = config.getString(JdbcUrl, "")
-    val user = config.getString(User, "")
-    val password = config.getString(Password, "")
+  val database = config.getString(Database, "")
+  val tableName = config.getString(TableName, "")
+  val jdbcUrl = config.getString(JdbcUrl, "")
+  val user = config.getString(User, "")
+  val password = config.getString(Password, "")
 
-    val concreteTableName = s"${database}.${tableName}"
+  val concreteTableName = s"${database}.${tableName}"
 
-    def data(ms: Long): (Option[DataFrame], TimeRange) = {
-        val dfOpt = try {
-            val prop = new Properties()
-            prop.put("user", user)
-            prop.put("password", password)
-            val df = sparkSession.read.jdbc(jdbcUrl, tableName, prop)
-            val dfOpt = Some(df)
-            val preDfOpt = preProcess(dfOpt, ms)
-            preDfOpt
-        } catch {
-            case e: Throwable =>
-                error(s"load hive table ${concreteTableName} fails: ${e.getMessage}", e)
-                None
-        }
-        val tmsts = readTmst(ms)
-        (dfOpt, TimeRange(ms, tmsts))
+  def data(ms: Long): (Option[DataFrame], TimeRange) = {
+    val dfOpt = try {
+      val prop = new Properties()
+      prop.put("user", user)
+      prop.put("password", password)
+      val df = sparkSession.read.jdbc(jdbcUrl, tableName, prop)
+      val dfOpt = Some(df)
+      val preDfOpt = preProcess(dfOpt, ms)
+      preDfOpt
+    } catch {
+      case e: Throwable =>
+        error(s"load hive table ${concreteTableName} fails: ${e.getMessage}", e)
+        None
     }
+    val tmsts = readTmst(ms)
+    (dfOpt, TimeRange(ms, tmsts))
+  }
 
 }
