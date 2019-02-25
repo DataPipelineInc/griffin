@@ -18,8 +18,6 @@ under the License.
 */
 package org.apache.griffin.measure.datasource.connector.batch
 
-import java.util.Properties
-
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import org.apache.griffin.measure.configuration.dqdefinition.DataConnectorParam
@@ -39,21 +37,22 @@ case class JdbcBatchDataConnector(@transient sparkSession: SparkSession,
   val JdbcUrl = "jdbc.url"
   val User = "jdbc.user"
   val Password = "jdbc.password"
+  val Sql = "jdbc.sql"
+  val Driver = "jdbc.driver"
 
   val database = config.getString(Database, "")
   val tableName = config.getString(TableName, "")
   val jdbcUrl = config.getString(JdbcUrl, "")
   val user = config.getString(User, "")
   val password = config.getString(Password, "")
+  val driver = config.getString(Driver, "");
+  val concreteTableName = config.getString(Sql, s"${database}.${tableName}")
 
-  val concreteTableName = s"${database}.${tableName}"
 
   def data(ms: Long): (Option[DataFrame], TimeRange) = {
     val dfOpt = try {
-      val prop = new Properties()
-      prop.put("user", user)
-      prop.put("password", password)
-      val df = sparkSession.read.jdbc(jdbcUrl, concreteTableName, prop)
+      val df = sparkSession.read.format("jdbc").option("url", jdbcUrl).option("driver", driver)
+        .option("user", user).option("password", password).option("dbtable", concreteTableName).load()
       val dfOpt = Some(df)
       val preDfOpt = preProcess(dfOpt, ms)
       preDfOpt

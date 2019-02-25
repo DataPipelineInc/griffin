@@ -10,12 +10,12 @@
           "type": "jdbc",
           "version": "1.0",
           "config": {
-            "database": "dp_stag",
-            "table.name": "aPK_table",
-            "jdbc.url": "jdbc:mysql://59.111.61.142:3306",
-            "jdbc.user": "root",
-            "jdbc.password": "datapipeline123",
-            "jdbc.driver": "com.mysql.jdbc.Driver"
+            "database": "dpl",
+            "table.name": "test_griffin_source",
+            "jdbc.url": "jdbc:hive2://master:10000",
+            "jdbc.user": "hdfs",
+            "jdbc.password": "",
+            "jdbc.driver": "org.apache.hive.jdbc.HiveDriver"
           }
         }
       ]
