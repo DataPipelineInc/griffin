@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--monitorInterval: 用于调整配置文件动态生效的扫描间隔(minimum = 5s)-->
+<!--status: 用于调整日志系统自身的日志打印级别-->
+<Configuration monitorInterval="30" status="info">
+    <Properties>
+        <!--========-->
+        <!--重要参数-->
+        <!--服务名称/日志文件名称-->
+        <Property name="SERVICE_NAME">dataPipeLine_griffin</Property>
+        <!--日志保存路径-->
+        <Property name="LOG_FILE_PATH">/home/log/${SERVICE_NAME}_log</Property>
+        <!--日志输出级别-->
+        <Property name="ROOT_LOG_LEVEL">INFO</Property>
+        <!--========-->
+
+        <!--========-->
+        <!--次要参数-->
+        <!--历史日志文件存放路径-->
+        <Property name="LOG_HISTORY_FILE_PATH">${LOG_FILE_PATH}</Property>
+        <!--历史日志文件扩展名(当扩展名为.zip/gz时，框架将自动对历史日志进行压缩)-->
+        <Property name="LOG_HISTORY_FILE_SUFFIX">.log</Property>
+        <!--日志打印格式-->
+        <Property name="LOG_PATTERN_DEFAULT">
+            [${SERVICE_NAME}][%d{yyyy-MM-dd HH:mm:ss.SSS}][%-5level][%thread][%logger{1}: %line] - %msg%n
+        </Property>
+        <!--单个日志文件大小-->
+        <Property name="LOG_FILE_SIZE">1000 MB</Property>
+        <!--日志保留数量-->
+        <Property name="LOG_FILE_ROLLOVER_CNT">100</Property>
+        <!--========-->
+    </Properties>
+
+    <Appenders>
+        <!--控制台输出-->
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="${LOG_PATTERN_DEFAULT}"/>
+        </Console>
+
+        <!--DEBUG级别日志输出-->
+        <RollingRandomAccessFile name="DebugFileAppender"
+                                 fileName="${LOG_FILE_PATH}/${SERVICE_NAME}_debug"
+                                 filePattern="${LOG_FILE_PATH}/${SERVICE_NAME}_debug_%d{yyyyMMdd}-%i${LOG_HISTORY_FILE_SUFFIX}">
+            <Filters>
+                <ThresholdFilter level="DEBUG"/>
+                <ThresholdFilter level="INFO" onMatch="DENY" onMismatch="NEUTRAL"/>
+            </Filters>
+            <PatternLayout pattern="${LOG_PATTERN_DEFAULT}"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy modulate="true" interval="1"/>
+                <SizeBasedTriggeringPolicy size="${LOG_FILE_SIZE}"/>
+            </Policies>
+            <DefaultRolloverStrategy max="${LOG_FILE_ROLLOVER_CNT}">
+                <Delete basePath="${LOG_FILE_PATH}" maxDepth="2">
+                    <IfFileName glob="*_debug_*.log"/>
+                    <IfLastModified age="10D"/>
+                </Delete>
+            </DefaultRolloverStrategy>
+        </RollingRandomAccessFile>
+
+        <!--INFO级别日志输出-->
+        <RollingRandomAccessFile name="InfoFileAppender"
+                                 fileName="${LOG_FILE_PATH}/${SERVICE_NAME}_info"
+                                 filePattern="${LOG_FILE_PATH}/${SERVICE_NAME}_info_%d{yyyyMMdd}-%i${LOG_HISTORY_FILE_SUFFIX}">
+            <Filters>
+                <ThresholdFilter level="INFO"/>
+                <ThresholdFilter level="WARN" onMatch="DENY" onMismatch="NEUTRAL"/>
+            </Filters>
+            <PatternLayout pattern="${LOG_PATTERN_DEFAULT}"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy modulate="true" interval="1"/>
+                <SizeBasedTriggeringPolicy size="${LOG_FILE_SIZE}"/>
+            </Policies>
+            <!-- 日志保留数量 -->
+            <DefaultRolloverStrategy max="${LOG_FILE_ROLLOVER_CNT}">
+                <Delete basePath="${LOG_FILE_PATH}" maxDepth="2">
+                    <IfFileName glob="*_info_*.log"/>
+                    <IfLastModified age="10D"/>
+                </Delete>
+            </DefaultRolloverStrategy>
+        </RollingRandomAccessFile>
+
+        <!--WARNING及以上级别日志输出-->
+        <RollingRandomAccessFile name="WarnFileAppender"
+                                 fileName="${LOG_FILE_PATH}/${SERVICE_NAME}_warn"
+                                 filePattern="${LOG_FILE_PATH}/${SERVICE_NAME}_warn_%d{yyyyMMdd}-%i${LOG_HISTORY_FILE_SUFFIX}">
+            <ThresholdFilter level="WARN"/>
+            <PatternLayout pattern="${LOG_PATTERN_DEFAULT}"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy modulate="true" interval="1"/>
+                <SizeBasedTriggeringPolicy size="${LOG_FILE_SIZE}"/>
+            </Policies>
+            <DefaultRolloverStrategy max="${LOG_FILE_ROLLOVER_CNT}">
+                <Delete basePath="${LOG_FILE_PATH}" maxDepth="2">
+                    <IfFileName glob="*_warn_*.log"/>
+                    <IfLastModified age="10D"/>
+                </Delete>
+            </DefaultRolloverStrategy>
+        </RollingRandomAccessFile>
+
+        <!--ERROR级别日志输出-->
+        <RollingRandomAccessFile name="ErrorFileAppender"
+                                 fileName="${LOG_FILE_PATH}/${SERVICE_NAME}_error"
+                                 filePattern="${LOG_FILE_PATH}/${SERVICE_NAME}_error_%d{yyyyMMdd}-%i${LOG_HISTORY_FILE_SUFFIX}">
+            <ThresholdFilter level="ERROR"/>
+            <PatternLayout pattern="${LOG_PATTERN_DEFAULT}"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy modulate="true" interval="1"/>
+                <SizeBasedTriggeringPolicy size="${LOG_FILE_SIZE}"/>
+            </Policies>
+            <DefaultRolloverStrategy max="${LOG_FILE_ROLLOVER_CNT}">
+                <Delete basePath="${LOG_FILE_PATH}" maxDepth="2">
+                    <IfFileName glob="*_error_*.log"/>
+                    <IfLastModified age="10D"/>
+                </Delete>
+            </DefaultRolloverStrategy>
+        </RollingRandomAccessFile>
+    </Appenders>
+
+    <Loggers>
+        <Root level="${ROOT_LOG_LEVEL}">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="DebugFileAppender"/>
+            <AppenderRef ref="InfoFileAppender"/>
+            <AppenderRef ref="WarnFileAppender"/>
+            <AppenderRef ref="ErrorFileAppender"/>
+        </Root>
+
+        <Logger name="org.apache.kafka" level="info" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="DebugFileAppender"/>
+            <AppenderRef ref="InfoFileAppender"/>
+            <AppenderRef ref="WarnFileAppender"/>
+            <AppenderRef ref="ErrorFileAppender"/>
+        </Logger>
+        <Logger name="org.springframework" level="info" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="DebugFileAppender"/>
+            <AppenderRef ref="InfoFileAppender"/>
+            <AppenderRef ref="WarnFileAppender"/>
+            <AppenderRef ref="ErrorFileAppender"/>
+        </Logger>
+        <Logger name="org.apache.ibatis" level="info" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="DebugFileAppender"/>
+            <AppenderRef ref="InfoFileAppender"/>
+            <AppenderRef ref="WarnFileAppender"/>
+            <AppenderRef ref="ErrorFileAppender"/>
+        </Logger>
+
+        <Logger name="org.mybatis" level="info" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="DebugFileAppender"/>
+            <AppenderRef ref="InfoFileAppender"/>
+            <AppenderRef ref="WarnFileAppender"/>
+            <AppenderRef ref="ErrorFileAppender"/>
+        </Logger>
+
+        <Logger name="springfox.documentation" level="info" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="DebugFileAppender"/>
+            <AppenderRef ref="InfoFileAppender"/>
+            <AppenderRef ref="WarnFileAppender"/>
+            <AppenderRef ref="ErrorFileAppender"/>
+        </Logger>
+    </Loggers>
+
+</Configuration>

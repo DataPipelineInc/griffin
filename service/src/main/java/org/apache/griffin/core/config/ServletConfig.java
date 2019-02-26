@@ -1,6 +1,7 @@
 package org.apache.griffin.core.config;
 
 import java.util.concurrent.TimeUnit;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.embedded.EmbeddedServletContainerFactory;
 import org.springframework.boot.context.embedded.jetty.JettyEmbeddedServletContainerFactory;
 import org.springframework.context.annotation.Bean;
@@ -18,7 +19,8 @@ public class ServletConfig {
     /**
      * Jetty Port
      **/
-    private static final int JETTY_PORT = 8080;
+    @Value("${jetty.port}")
+    private int jettyPort;
 
     /**
      * Jetty Session Time out
@@ -29,7 +31,7 @@ public class ServletConfig {
     @Bean
     public EmbeddedServletContainerFactory servletContainer() {
         JettyEmbeddedServletContainerFactory factory = new JettyEmbeddedServletContainerFactory();
-        factory.setPort(JETTY_PORT);
+        factory.setPort(jettyPort);
         factory.setSessionTimeout(SESSION_TIMEOUT, TimeUnit.HOURS);
         return factory;
     }
