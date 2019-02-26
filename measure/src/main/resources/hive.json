@@ -1,0 +1,44 @@
+{
+  "name": "batch_prof",
+  "process.type": "batch",
+  "data.sources": [
+    {
+      "name": "src",
+      "baseline": true,
+      "connectors": [
+        {
+          "type": "jdbc",
+          "version": "1.0",
+          "config": {
+            "database": "dpl",
+            "table.name": "test_griffin_source",
+            "jdbc.url": "jdbc:hive2://master:10000",
+            "jdbc.user": "hdfs",
+            "jdbc.password": "",
+            "jdbc.driver": "org.apache.hive.jdbc.HiveDriver"
+          }
+        }
+      ]
+    }
+  ],
+  "evaluate.rule": {
+    "rules": [
+      {
+        "dsl.type": "griffin-dsl",
+        "dq.type": "profiling",
+        "out.dataframe.name": "prof",
+        "rule": "src.id.count() AS id_count",
+        "out": [
+          {
+            "type": "metric",
+            "name": "prof"
+          }
+        ]
+      }
+    ]
+  },
+  "sinks": [
+    "CONSOLE",
+    "HDFS"
+  ]
+}
