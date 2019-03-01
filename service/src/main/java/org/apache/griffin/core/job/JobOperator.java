@@ -40,4 +40,6 @@ public interface JobOperator {
 
     JobState getState(AbstractJob job, String action)
             throws SchedulerException;
+
+    void one(AbstractJob job) throws SchedulerException;
 }

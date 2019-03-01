@@ -21,10 +21,20 @@ package org.apache.griffin.core.job.entity;
 
 public enum JobType {
 
-    BATCH("batch"), //
-    STREAMING("streaming"), //
+    /*
+     * Quartz Batch job(Cron)
+     **/
+    BATCH("batch"),
+    /*
+     * Quartz Batch job(Simple)
+     * TODO: Name reconstruction
+     **/
+    SIMPLE("simple"),
+    /*
+     * Quartz Streaming job(Cron)
+     **/
+    STREAMING("streaming"),
     VIRTUAL("virtual");
-
     private String name;
 
     private JobType(String name) {

@@ -19,12 +19,44 @@ under the License.
 
 package org.apache.griffin.core.job;
 
-import com.fasterxml.jackson.core.type.TypeReference;
+import static java.util.TimeZone.getTimeZone;
+import static org.apache.griffin.core.config.EnvConfig.ENV_BATCH;
+import static org.apache.griffin.core.config.EnvConfig.ENV_STREAMING;
+import static org.apache.griffin.core.exception.GriffinExceptionMessage.INVALID_MEASURE_ID;
+import static org.apache.griffin.core.exception.GriffinExceptionMessage.JOB_ID_DOES_NOT_EXIST;
+import static org.apache.griffin.core.exception.GriffinExceptionMessage.JOB_NAME_DOES_NOT_EXIST;
+import static org.apache.griffin.core.exception.GriffinExceptionMessage.JOB_TYPE_DOES_NOT_SUPPORT;
+import static org.apache.griffin.core.exception.GriffinExceptionMessage.MEASURE_TYPE_DOES_NOT_SUPPORT;
+import static org.apache.griffin.core.exception.GriffinExceptionMessage.NO_SUCH_JOB_ACTION;
+import static org.apache.griffin.core.exception.GriffinExceptionMessage.QUARTZ_JOB_ALREADY_EXIST;
+import static org.apache.griffin.core.job.entity.LivySessionStates.State.BUSY;
+import static org.apache.griffin.core.job.entity.LivySessionStates.State.DEAD;
+import static org.apache.griffin.core.job.entity.LivySessionStates.State.IDLE;
+import static org.apache.griffin.core.job.entity.LivySessionStates.State.NOT_STARTED;
+import static org.apache.griffin.core.job.entity.LivySessionStates.State.RECOVERING;
+import static org.apache.griffin.core.job.entity.LivySessionStates.State.RUNNING;
+import static org.apache.griffin.core.job.entity.LivySessionStates.State.STARTING;
+import static org.apache.griffin.core.job.entity.LivySessionStates.State.SUCCESS;
+import static org.apache.griffin.core.job.entity.LivySessionStates.State.UNKNOWN;
+import static org.apache.griffin.core.job.entity.LivySessionStates.isActive;
+import static org.apache.griffin.core.measure.entity.GriffinMeasure.ProcessType.BATCH;
+import static org.apache.griffin.core.measure.entity.GriffinMeasure.ProcessType.STREAMING;
+import static org.quartz.CronScheduleBuilder.cronSchedule;
+import static org.quartz.JobBuilder.newJob;
+import static org.quartz.JobKey.jobKey;
+import static org.quartz.SimpleScheduleBuilder.simpleSchedule;
+import static org.quartz.TriggerBuilder.newTrigger;
+import static org.quartz.TriggerKey.triggerKey;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.TimeZone;
 import org.apache.commons.lang.StringUtils;
 import org.apache.griffin.core.event.GriffinEventManager;
-import org.apache.griffin.core.exception.GriffinException;
 import org.apache.griffin.core.event.JobEvent;
+import org.apache.griffin.core.exception.GriffinException;
 import org.apache.griffin.core.job.entity.AbstractJob;
 import org.apache.griffin.core.job.entity.BatchJob;
 import org.apache.griffin.core.job.entity.JobHealth;
@@ -33,10 +65,12 @@ import org.apache.griffin.core.job.entity.JobState;
 import org.apache.griffin.core.job.entity.JobType;
 import org.apache.griffin.core.job.entity.LivySessionStates;
 import org.apache.griffin.core.job.entity.LivySessionStates.State;
+import org.apache.griffin.core.job.entity.SimpleJob;
 import org.apache.griffin.core.job.entity.StreamingJob;
 import org.apache.griffin.core.job.repo.BatchJobRepo;
 import org.apache.griffin.core.job.repo.JobInstanceRepo;
 import org.apache.griffin.core.job.repo.JobRepo;
+import org.apache.griffin.core.job.repo.SimpleJobRepo;
 import org.apache.griffin.core.job.repo.StreamingJobRepo;
 import org.apache.griffin.core.measure.entity.GriffinMeasure;
 import org.apache.griffin.core.measure.entity.GriffinMeasure.ProcessType;
@@ -68,50 +102,16 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.TimeZone;
-
-import static java.util.TimeZone.getTimeZone;
-import static org.apache.griffin.core.config.EnvConfig.ENV_BATCH;
-import static org.apache.griffin.core.config.EnvConfig.ENV_STREAMING;
-import static org.apache.griffin.core.exception.GriffinExceptionMessage.INVALID_MEASURE_ID;
-import static org.apache.griffin.core.exception.GriffinExceptionMessage.JOB_ID_DOES_NOT_EXIST;
-import static org.apache.griffin.core.exception.GriffinExceptionMessage.JOB_NAME_DOES_NOT_EXIST;
-import static org.apache.griffin.core.exception.GriffinExceptionMessage.JOB_TYPE_DOES_NOT_SUPPORT;
-import static org.apache.griffin.core.exception.GriffinExceptionMessage.MEASURE_TYPE_DOES_NOT_SUPPORT;
-import static org.apache.griffin.core.exception.GriffinExceptionMessage.NO_SUCH_JOB_ACTION;
-import static org.apache.griffin.core.exception.GriffinExceptionMessage.QUARTZ_JOB_ALREADY_EXIST;
-import static org.apache.griffin.core.job.entity.LivySessionStates.State.STARTING;
-import static org.apache.griffin.core.job.entity.LivySessionStates.State.UNKNOWN;
-import static org.apache.griffin.core.job.entity.LivySessionStates.State.NOT_STARTED;
-import static org.apache.griffin.core.job.entity.LivySessionStates.State.RECOVERING;
-import static org.apache.griffin.core.job.entity.LivySessionStates.State.IDLE;
-import static org.apache.griffin.core.job.entity.LivySessionStates.State.RUNNING;
-import static org.apache.griffin.core.job.entity.LivySessionStates.State.BUSY;
-import static org.apache.griffin.core.job.entity.LivySessionStates.State.DEAD;
-import static org.apache.griffin.core.job.entity.LivySessionStates.State.SUCCESS;
-
-import static org.apache.griffin.core.job.entity.LivySessionStates.isActive;
-import static org.apache.griffin.core.measure.entity.GriffinMeasure.ProcessType.BATCH;
-import static org.apache.griffin.core.measure.entity.GriffinMeasure.ProcessType.STREAMING;
-import static org.quartz.CronScheduleBuilder.cronSchedule;
-import static org.quartz.JobBuilder.newJob;
-import static org.quartz.JobKey.jobKey;
-import static org.quartz.SimpleScheduleBuilder.simpleSchedule;
-import static org.quartz.TriggerBuilder.newTrigger;
-import static org.quartz.TriggerKey.triggerKey;
-
 @Service
 public class JobServiceImpl implements JobService {
     private static final Logger LOGGER = LoggerFactory
-        .getLogger(JobServiceImpl.class);
+            .getLogger(JobServiceImpl.class);
     public static final String GRIFFIN_JOB_ID = "griffinJobId";
     private static final int MAX_PAGE_SIZE = 1024;
     private static final int DEFAULT_PAGE_SIZE = 10;
     static final String START = "start";
     static final String STOP = "stop";
+    static final String ONE = "one";
 
     @Autowired
     private SchedulerFactoryBean factory;
@@ -126,11 +126,15 @@ public class JobServiceImpl implements JobService {
     @Autowired
     private StreamingJobRepo streamingJobRepo;
     @Autowired
+    private SimpleJobRepo simpleJobRepo;
+    @Autowired
     private JobRepo<AbstractJob> jobRepo;
     @Autowired
     private BatchJobOperatorImpl batchJobOp;
     @Autowired
     private StreamingJobOperatorImpl streamingJobOp;
+    @Autowired
+    private SimpleJobOperatorImpl simpleJobOp;
     @Autowired
     private GriffinEventManager eventManager;
     @Autowired
@@ -149,6 +153,8 @@ public class JobServiceImpl implements JobService {
             jobs = batchJobRepo.findByDeleted(false);
         } else if (JobType.STREAMING.getName().equals(type)) {
             jobs = streamingJobRepo.findByDeleted(false);
+        } else if (JobType.SIMPLE.getName().equals(type)) {
+            jobs = simpleJobRepo.findByDeleted(false);
         } else {
             jobs = jobRepo.findByDeleted(false);
         }
@@ -166,7 +172,7 @@ public class JobServiceImpl implements JobService {
         } catch (SchedulerException e) {
             LOGGER.error("Failed to get RUNNING jobs.", e);
             throw new GriffinException
-                .ServiceException("Failed to get RUNNING jobs.", e);
+                    .ServiceException("Failed to get RUNNING jobs.", e);
         }
         return dataList;
     }
@@ -177,7 +183,7 @@ public class JobServiceImpl implements JobService {
         eventManager.notifyListeners(jobEvent);
         Long measureId = job.getMeasureId();
         GriffinMeasure measure = getMeasureIfValid(measureId);
-        JobOperator op = getJobOperator(measure.getProcessType());
+        JobOperator op = getJobOperator(job);
         AbstractJob jobSaved = op.add(job, measure);
         jobEvent = JobEvent.yieldJobEventAfterCreation(jobSaved);
         eventManager.notifyListeners(jobEvent);
@@ -190,7 +196,7 @@ public class JobServiceImpl implements JobService {
         if (job == null) {
             LOGGER.warn("Job id {} does not exist.", jobId);
             throw new GriffinException
-                .NotFoundException(JOB_ID_DOES_NOT_EXIST);
+                    .NotFoundException(JOB_ID_DOES_NOT_EXIST);
         }
         return job;
     }
@@ -211,7 +217,7 @@ public class JobServiceImpl implements JobService {
     }
 
     private void doAction(String action, AbstractJob job, JobOperator op)
-        throws Exception {
+            throws Exception {
         switch (action) {
             case START:
                 op.start(job);
@@ -219,9 +225,12 @@ public class JobServiceImpl implements JobService {
             case STOP:
                 op.stop(job);
                 break;
+            case ONE:
+                op.one(job);
+                break;
             default:
                 throw new GriffinException
-                    .NotFoundException(NO_SUCH_JOB_ACTION);
+                        .NotFoundException(NO_SUCH_JOB_ACTION);
         }
     }
 
@@ -256,7 +265,7 @@ public class JobServiceImpl implements JobService {
         if (CollectionUtils.isEmpty(jobs)) {
             LOGGER.warn("There is no job with '{}' name.", name);
             throw new GriffinException
-                .NotFoundException(JOB_NAME_DOES_NOT_EXIST);
+                    .NotFoundException(JOB_NAME_DOES_NOT_EXIST);
         }
         for (AbstractJob job : jobs) {
             JobEvent event = JobEvent.yieldJobEventBeforeRemoval(job);
@@ -270,21 +279,21 @@ public class JobServiceImpl implements JobService {
 
     @Override
     public List<JobInstanceBean> findInstancesOfJob(
-        Long jobId,
-        int page,
-        int size) {
+            Long jobId,
+            int page,
+            int size) {
         AbstractJob job = jobRepo.findByIdAndDeleted(jobId, false);
         if (job == null) {
             LOGGER.warn("Job id {} does not exist.", jobId);
             throw new GriffinException
-                .NotFoundException(JOB_ID_DOES_NOT_EXIST);
+                    .NotFoundException(JOB_ID_DOES_NOT_EXIST);
         }
         size = size > MAX_PAGE_SIZE ? MAX_PAGE_SIZE : size;
         size = size <= 0 ? DEFAULT_PAGE_SIZE : size;
         Pageable pageable = new PageRequest(page, size,
-            Sort.Direction.DESC, "tms");
+                Sort.Direction.DESC, "tms");
         List<JobInstanceBean> instances = instanceRepo.findByJobId(jobId,
-            pageable);
+                pageable);
         return updateState(instances);
     }
 
@@ -315,7 +324,7 @@ public class JobServiceImpl implements JobService {
             } catch (SchedulerException e) {
                 LOGGER.error("Job schedule exception. {}", e);
                 throw new GriffinException
-                    .ServiceException("Fail to Get HealthInfo", e);
+                        .ServiceException("Fail to Get HealthInfo", e);
             }
 
         }
@@ -326,8 +335,8 @@ public class JobServiceImpl implements JobService {
     public void deleteExpiredJobInstance() {
         Long timeMills = System.currentTimeMillis();
         List<JobInstanceBean> instances = instanceRepo
-            .findByExpireTmsLessThanEqual
-                (timeMills);
+                .findByExpireTmsLessThanEqual
+                        (timeMills);
         if (!batchJobOp.pauseJobInstances(instances)) {
             LOGGER.error("Pause job failure.");
             return;
@@ -348,9 +357,11 @@ public class JobServiceImpl implements JobService {
             return batchJobOp;
         } else if (job instanceof StreamingJob) {
             return streamingJobOp;
+        } else if (job instanceof SimpleJob) {
+            return simpleJobOp;
         }
         throw new GriffinException.BadRequestException
-            (JOB_TYPE_DOES_NOT_SUPPORT);
+                (JOB_TYPE_DOES_NOT_SUPPORT);
     }
 
     private JobOperator getJobOperator(ProcessType type) {
@@ -360,21 +371,21 @@ public class JobServiceImpl implements JobService {
             return streamingJobOp;
         }
         throw new GriffinException.BadRequestException
-            (MEASURE_TYPE_DOES_NOT_SUPPORT);
+                (MEASURE_TYPE_DOES_NOT_SUPPORT);
     }
 
     TriggerKey getTriggerKeyIfValid(String qName, String qGroup) throws
-        SchedulerException {
+            SchedulerException {
         TriggerKey triggerKey = triggerKey(qName, qGroup);
         if (factory.getScheduler().checkExists(triggerKey)) {
             throw new GriffinException.ConflictException
-                (QUARTZ_JOB_ALREADY_EXIST);
+                    (QUARTZ_JOB_ALREADY_EXIST);
         }
         return triggerKey;
     }
 
     List<? extends Trigger> getTriggers(String name, String group) throws
-        SchedulerException {
+            SchedulerException {
         if (name == null || group == null) {
             return null;
         }
@@ -384,7 +395,7 @@ public class JobServiceImpl implements JobService {
     }
 
     private JobState genJobState(AbstractJob job, String action) throws
-        SchedulerException {
+            SchedulerException {
         JobOperator op = getJobOperator(job);
         JobState state = op.getState(job, action);
         job.setJobState(state);
@@ -395,9 +406,9 @@ public class JobServiceImpl implements JobService {
         return genJobState(job, null);
     }
 
-    void addJob(TriggerKey tk, AbstractJob job, ProcessType type) throws
-        Exception {
-        JobDetail jobDetail = addJobDetail(tk, job);
+    void addJob(TriggerKey tk, AbstractJob job, JobType type) throws
+            Exception {
+        JobDetail jobDetail = addJobDetail(tk, job, type);
         Trigger trigger = genTriggerInstance(tk, jobDetail, job, type);
         factory.getScheduler().scheduleJob(trigger);
     }
@@ -406,8 +417,16 @@ public class JobServiceImpl implements JobService {
         return job.getJobName() + "_" + System.currentTimeMillis();
     }
 
-    String getQuartzGroup() {
-        return "BA";
+    String getQuartzGroup(JobType type) {
+        if (type == JobType.BATCH) {
+            return "BA";
+        } else if (type == JobType.SIMPLE) {
+            return "SI";
+        } else if (type == JobType.STREAMING) {
+            return "STR";
+        } else {
+            return "UNKNOWN";
+        }
     }
 
     boolean isValidJobName(String jobName) {
@@ -426,34 +445,37 @@ public class JobServiceImpl implements JobService {
 
     private GriffinMeasure getMeasureIfValid(Long measureId) {
         GriffinMeasure measure = measureRepo.findByIdAndDeleted(measureId,
-            false);
+                false);
         if (measure == null) {
             LOGGER.warn("The measure id {} isn't valid. Maybe it doesn't " +
-                    "exist or is external measure type.",
-                measureId);
+                            "exist or is external measure type.",
+                    measureId);
             throw new GriffinException.BadRequestException(INVALID_MEASURE_ID);
         }
         return measure;
     }
 
     private Trigger genTriggerInstance(TriggerKey tk, JobDetail jd, AbstractJob
-        job, ProcessType type) {
+            job, JobType type) {
         TriggerBuilder builder = newTrigger().withIdentity(tk).forJob(jd);
-        if (type == BATCH) {
+        if (type == JobType.BATCH) {
             TimeZone timeZone = getTimeZone(job.getTimeZone());
             return builder.withSchedule(cronSchedule(job.getCronExpression())
-                .inTimeZone(timeZone)).build();
-        } else if (type == STREAMING) {
+                    .inTimeZone(timeZone)).build();
+        } else if (type == JobType.STREAMING) {
             return builder.startNow().withSchedule(simpleSchedule()
-                .withRepeatCount(0)).build();
+                    .withRepeatCount(0)).build();
+        } else if (type == JobType.SIMPLE) {
+            //TODO:目前只支持执行一次，日后可以定义更加复杂的simplejob
+            return builder.startNow().withSchedule(simpleSchedule().withIntervalInSeconds(3)
+                    .withRepeatCount(0)).build();
         }
         throw new GriffinException.BadRequestException
-            (JOB_TYPE_DOES_NOT_SUPPORT);
-
+                (JOB_TYPE_DOES_NOT_SUPPORT);
     }
 
-    private JobDetail addJobDetail(TriggerKey triggerKey, AbstractJob job)
-        throws SchedulerException {
+    private JobDetail addJobDetail(TriggerKey triggerKey, AbstractJob job, JobType type)
+            throws SchedulerException {
         Scheduler scheduler = factory.getScheduler();
         JobKey jobKey = jobKey(triggerKey.getName(), triggerKey.getGroup());
         JobDetail jobDetail;
@@ -461,8 +483,8 @@ public class JobServiceImpl implements JobService {
         if (isJobKeyExist) {
             jobDetail = scheduler.getJobDetail(jobKey);
         } else {
-            jobDetail = newJob(JobInstance.class).storeDurably().withIdentity
-                (jobKey).build();
+            jobDetail = newJob(JobInstance.class).withDescription(type + "Job").storeDurably().withIdentity
+                    (jobKey).build();
         }
         setJobDataMap(jobDetail, job);
         scheduler.addJob(jobDetail, isJobKeyExist);
@@ -483,9 +505,9 @@ public class JobServiceImpl implements JobService {
      * @param measureId measure id
      */
     public void deleteJobsRelateToMeasure(Long measureId) throws
-        SchedulerException {
+            SchedulerException {
         List<AbstractJob> jobs = jobRepo.findByMeasureIdAndDeleted(measureId,
-            false);
+                false);
         if (CollectionUtils.isEmpty(jobs)) {
             LOGGER.info("Measure id {} has no related jobs.", measureId);
             return;
@@ -499,7 +521,7 @@ public class JobServiceImpl implements JobService {
     @Scheduled(fixedDelayString = "${jobInstance.fixedDelay.in.milliseconds}")
     public void syncInstancesOfAllJobs() {
         LivySessionStates.State[] states = {STARTING, NOT_STARTED, RECOVERING,
-            IDLE, RUNNING, BUSY};
+                IDLE, RUNNING, BUSY};
         List<JobInstanceBean> beans = instanceRepo.findByActiveState(states);
         for (JobInstanceBean jobInstance : beans) {
             syncInstancesOfJob(jobInstance);
@@ -517,21 +539,21 @@ public class JobServiceImpl implements JobService {
             return;
         }
         String uri = env.getProperty("livy.uri") + "/"
-            + instance.getSessionId();
+                + instance.getSessionId();
         TypeReference<HashMap<String, Object>> type =
-            new TypeReference<HashMap<String, Object>>() {
-            };
+                new TypeReference<HashMap<String, Object>>() {
+                };
         try {
             String resultStr = restTemplate.getForObject(uri, String.class);
             HashMap<String, Object> resultMap = JsonUtil.toEntity(resultStr,
-                type);
+                    type);
             setJobInstanceIdAndUri(instance, resultMap);
         } catch (ResourceAccessException e) {
             LOGGER.error("Your url may be wrong. Please check {}.\n {}", uri, e
-                .getMessage());
+                    .getMessage());
         } catch (HttpClientErrorException e) {
             LOGGER.warn("sessionId({}) appId({}) {}.", instance.getSessionId(),
-                instance.getAppId(), e.getMessage());
+                    instance.getAppId(), e.getMessage());
             setStateByYarn(instance, e);
             livyTaskSubmitHelper.decreaseCurTaskNum(instance.getId());
         } catch (Exception e) {
@@ -545,7 +567,7 @@ public class JobServiceImpl implements JobService {
         if (!checkStatus(instance, e)) {
             int code = e.getStatusCode().value();
             boolean match = (code == 400 || code == 404)
-                && instance.getAppId() != null;
+                    && instance.getAppId() != null;
             //this means your url is correct,but your param is wrong or livy
             //session may be overdue.
             if (match) {
@@ -575,7 +597,7 @@ public class JobServiceImpl implements JobService {
         // {id} not found',this means instance may not be scheduled for
         // a long time by spark for too many tasks. It may be dead.
         if (code == 404 && appId == null && (responseBody != null &&
-            responseBody.contains(sessionId.toString()))) {
+                responseBody.contains(sessionId.toString()))) {
             instance.setState(DEAD);
             instance.setDeleted(true);
             instanceRepo.save(instance);
@@ -586,7 +608,7 @@ public class JobServiceImpl implements JobService {
 
     private void setStateByYarn(JobInstanceBean instance) {
         LOGGER.warn("Spark session {} may be overdue! " +
-            "Now we use yarn to update state.", instance.getSessionId());
+                "Now we use yarn to update state.", instance.getSessionId());
         String yarnUrl = env.getProperty("yarn.uri");
         boolean success = YarnNetUtil.update(yarnUrl, instance);
         if (!success) {
@@ -600,16 +622,16 @@ public class JobServiceImpl implements JobService {
 
 
     private void setJobInstanceIdAndUri(JobInstanceBean instance, HashMap<String
-        , Object> resultMap) {
+            , Object> resultMap) {
         if (resultMap != null) {
             Object state = resultMap.get("state");
             Object appId = resultMap.get("appId");
             instance.setState(state == null ? null : LivySessionStates.State
-                .valueOf(state.toString().toUpperCase
-                    ()));
+                    .valueOf(state.toString().toUpperCase
+                            ()));
             instance.setAppId(appId == null ? null : appId.toString());
             instance.setAppUri(appId == null ? null : env
-                .getProperty("yarn.uri") + "/cluster/app/" + appId);
+                    .getProperty("yarn.uri") + "/cluster/app/" + appId);
             instanceRepo.save(instance);
             // If Livy returns to success or dead, task execution completes one,TaskNum--
             if (SUCCESS.equals(state) || DEAD.equals(state)) {
@@ -621,25 +643,25 @@ public class JobServiceImpl implements JobService {
     public Boolean isJobHealthy(Long jobId) {
         Pageable pageable = new PageRequest(0, 1, Sort.Direction.DESC, "tms");
         List<JobInstanceBean> instances = instanceRepo.findByJobId(jobId,
-            pageable);
+                pageable);
         return !CollectionUtils.isEmpty(instances) && LivySessionStates
-            .isHealthy(instances.get(0).getState());
+                .isHealthy(instances.get(0).getState());
     }
 
     @Override
     public String getJobHdfsSinksPath(String jobName, long timestamp) {
         List<AbstractJob> jobList = jobRepo.findByJobNameAndDeleted(
-            jobName, false);
+                jobName, false);
         if (jobList.size() == 0) {
             return null;
         }
         if (jobList.get(0).getType().toLowerCase().equals("batch")) {
             return getSinksPath(ENV_BATCH)
-                + "/" + jobName + "/" + timestamp + "";
+                    + "/" + jobName + "/" + timestamp + "";
         }
 
         return getSinksPath(ENV_STREAMING)
-            + "/" + jobName + "/" + timestamp + "";
+                + "/" + jobName + "/" + timestamp + "";
     }
 
     private String getSinksPath(String jsonString) {
@@ -649,9 +671,9 @@ public class JobServiceImpl implements JobService {
             for (int i = 0; i < persistArray.length(); i++) {
                 Object type = persistArray.getJSONObject(i).get("type");
                 if (type instanceof String
-                    && "hdfs".equalsIgnoreCase(String.valueOf(type))) {
+                        && "hdfs".equalsIgnoreCase(String.valueOf(type))) {
                     return persistArray.getJSONObject(i)
-                        .getJSONObject("config").getString("path");
+                            .getJSONObject("config").getString("path");
                 }
             }
 
