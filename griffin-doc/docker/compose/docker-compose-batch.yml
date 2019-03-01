@@ -16,7 +16,7 @@
 #under the License.
 
 griffin:
-  image: apachegriffin/griffin_spark2:0.3.0
+  image: griffin_spark2:dp
   hostname: griffin
   links:
     - es
