@@ -19,6 +19,7 @@ under the License.
 package org.apache.griffin.core.metastore.hive;
 
 
+import io.swagger.annotations.Api;
 import java.util.List;
 import java.util.Map;
 
@@ -31,6 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/metadata/hive")
+@Api(value = "Hive源数据管理模块", tags = "Hive源数据管理模块")
 public class HiveMetaStoreController {
 
     @Autowired

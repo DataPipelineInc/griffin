@@ -31,7 +31,7 @@ public class SwaggerConfig {
     /**
      * Swagger Doc Version
      **/
-    private static final String DOC_VERSION = "apache griffin-dataPipeline-custom";
+    private static final String DOC_VERSION = "v1.0";
 
     @Bean
     public Docket createRestApi() {
