@@ -1,0 +1,11 @@
+{
+  "type": "mysql",
+  "version": "5.7",
+  "config": {
+    "database": "dp_stag",
+    "table.name": "aPK_table",
+    "jdbc.url": "jdbc:mysql://59.111.61.142:3306/",
+    "jdbc.user": "root",
+    "jdbc.password": "datapipeline123"
+  }
+}
