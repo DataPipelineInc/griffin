@@ -19,6 +19,8 @@ under the License.
 
 package org.apache.griffin.core.metric;
 
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
 import java.util.List;
 import java.util.Map;
 
@@ -36,16 +38,21 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1")
+@Api(value = "度量标准结果模块", tags = "度量标准结果模块")
 public class MetricController {
 
     @Autowired
     private MetricService metricService;
 
+
+
+    @ApiOperation(value = "根据measure名字获取对应任务以及执行结果")
     @RequestMapping(value = "/metrics", method = RequestMethod.GET)
     public Map<String, List<Metric>> getAllMetrics() {
         return metricService.getAllMetrics();
     }
 
+    @ApiOperation(value = "根据任务名字获取执行结果")
     @RequestMapping(value = "/metrics/values", method = RequestMethod.GET)
     public List<MetricValue> getMetricValues(@RequestParam("metricName")
                                                      String metricName,
@@ -59,12 +66,16 @@ public class MetricController {
         return metricService.getMetricValues(metricName, offset, size, tmst);
     }
 
+
+    @ApiOperation(value = "新建一个任务结果")
     @RequestMapping(value = "/metrics/values", method = RequestMethod.POST)
     public ResponseEntity<?> addMetricValues(@RequestBody List<MetricValue>
                                                      values) {
         return metricService.addMetricValues(values);
     }
 
+
+    @ApiOperation(value = "根据任务名字删除执行结果")
     @RequestMapping(value = "/metrics/values", method = RequestMethod.DELETE)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public ResponseEntity<?> deleteMetricValues(@RequestParam("metricName")
