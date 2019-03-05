@@ -23,15 +23,14 @@ import static org.apache.griffin.core.exception.GriffinExceptionMessage.INVALID_
 import static org.apache.griffin.core.exception.GriffinExceptionMessage.STREAMING_JOB_IS_RUNNING;
 import static org.apache.griffin.core.job.JobServiceImpl.START;
 import static org.apache.griffin.core.job.JobServiceImpl.STOP;
+import static org.apache.griffin.core.job.entity.JobType.STREAMING;
 import static org.apache.griffin.core.job.entity.LivySessionStates.State;
 import static org.apache.griffin.core.job.entity.LivySessionStates.State.STOPPED;
 import static org.apache.griffin.core.job.entity.LivySessionStates.convert2QuartzState;
-import static org.apache.griffin.core.measure.entity.GriffinMeasure.ProcessType.STREAMING;
 import static org.quartz.TriggerKey.triggerKey;
 
 import java.util.List;
 import javax.annotation.PostConstruct;
-
 import org.apache.griffin.core.exception.GriffinException;
 import org.apache.griffin.core.job.entity.AbstractJob;
 import org.apache.griffin.core.job.entity.JobHealth;
@@ -88,7 +87,7 @@ public class StreamingJobOperatorImpl implements JobOperator {
             Exception {
         validateParams(job);
         String qName = jobService.getQuartzName(job);
-        String qGroup = jobService.getQuartzGroup();
+        String qGroup = jobService.getQuartzGroup(STREAMING);
         TriggerKey triggerKey = jobService.getTriggerKeyIfValid(qName, qGroup);
         StreamingJob streamingJob = genStreamingJobBean(job, qName, qGroup);
         streamingJob = streamingJobRepo.save(streamingJob);
@@ -118,7 +117,7 @@ public class StreamingJobOperatorImpl implements JobOperator {
         verifyJobState(streamingJob);
         streamingJob = streamingJobRepo.save(streamingJob);
         String qName = jobService.getQuartzName(job);
-        String qGroup = jobService.getQuartzGroup();
+        String qGroup = jobService.getQuartzGroup(STREAMING);
         TriggerKey triggerKey = triggerKey(qName, qGroup);
         jobService.addJob(triggerKey, streamingJob, STREAMING);
     }
@@ -190,6 +189,11 @@ public class StreamingJobOperatorImpl implements JobOperator {
         return jobState;
     }
 
+    @Override
+    public void one(AbstractJob job) throws SchedulerException {
+
+    }
+
     private void setStateIfNull(String action, JobState jobState) {
         if (jobState.getState() == null && START.equals(action)) {
             jobState.setState("NORMAL");
@@ -198,7 +202,6 @@ public class StreamingJobOperatorImpl implements JobOperator {
             jobState.setState("NONE");
             jobState.setToStart(true);
         }
-
     }
 
     /**
@@ -209,7 +212,7 @@ public class StreamingJobOperatorImpl implements JobOperator {
      * started
      */
     private boolean getStartStatus(String state) {
-        return !"NORMAL" .equals(state) && !"BLOCKED" .equals(state);
+        return !"NORMAL".equals(state) && !"BLOCKED".equals(state);
     }
 
     /**
@@ -220,7 +223,7 @@ public class StreamingJobOperatorImpl implements JobOperator {
      * stopped
      */
     private boolean getStopStatus(String state) {
-        return !"COMPLETE" .equals(state) && !"ERROR" .equals(state);
+        return !"COMPLETE".equals(state) && !"ERROR".equals(state);
     }
 
     private void deleteByLivy(JobInstanceBean instance) {

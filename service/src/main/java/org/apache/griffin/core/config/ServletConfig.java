@@ -20,7 +20,6 @@ public class ServletConfig {
     /**
      * Jetty Port
      **/
-
     @Value("${jetty.port}")
     private int jettyPort;
 

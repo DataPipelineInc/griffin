@@ -1,36 +1,14 @@
-/*
-Licensed to the Apache Software Foundation (ASF) under one
-or more contributor license agreements.  See the NOTICE file
-distributed with this work for additional information
-regarding copyright ownership.  The ASF licenses this file
-to you under the Apache License, Version 2.0 (the
-"License"); you may not use this file except in compliance
-with the License.  You may obtain a copy of the License at
-
-  http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing,
-software distributed under the License is distributed on an
-"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-KIND, either express or implied.  See the License for the
-specific language governing permissions and limitations
-under the License.
-*/
-
 package org.apache.griffin.core.job;
 
 import static org.apache.griffin.core.exception.GriffinExceptionMessage.INVALID_CONNECTOR_NAME;
-import static org.apache.griffin.core.exception.GriffinExceptionMessage.INVALID_CRON_EXPRESSION;
 import static org.apache.griffin.core.exception.GriffinExceptionMessage.INVALID_JOB_NAME;
 import static org.apache.griffin.core.exception.GriffinExceptionMessage.JOB_IS_NOT_IN_PAUSED_STATUS;
 import static org.apache.griffin.core.exception.GriffinExceptionMessage.JOB_IS_NOT_SCHEDULED;
 import static org.apache.griffin.core.exception.GriffinExceptionMessage.JOB_KEY_DOES_NOT_EXIST;
 import static org.apache.griffin.core.exception.GriffinExceptionMessage.MISSING_BASELINE_CONFIG;
-import static org.apache.griffin.core.job.entity.JobType.BATCH;
-import static org.quartz.CronExpression.isValidExpression;
+import static org.apache.griffin.core.job.entity.JobType.SIMPLE;
 import static org.quartz.JobKey.jobKey;
 import static org.quartz.SimpleScheduleBuilder.simpleSchedule;
-import static org.quartz.Trigger.TriggerState;
 import static org.quartz.Trigger.TriggerState.BLOCKED;
 import static org.quartz.Trigger.TriggerState.NORMAL;
 import static org.quartz.Trigger.TriggerState.PAUSED;
@@ -45,14 +23,14 @@ import java.util.List;
 import java.util.Set;
 import org.apache.griffin.core.exception.GriffinException;
 import org.apache.griffin.core.job.entity.AbstractJob;
-import org.apache.griffin.core.job.entity.BatchJob;
 import org.apache.griffin.core.job.entity.JobDataSegment;
 import org.apache.griffin.core.job.entity.JobHealth;
 import org.apache.griffin.core.job.entity.JobInstanceBean;
 import org.apache.griffin.core.job.entity.JobState;
 import org.apache.griffin.core.job.entity.LivySessionStates;
-import org.apache.griffin.core.job.repo.BatchJobRepo;
+import org.apache.griffin.core.job.entity.SimpleJob;
 import org.apache.griffin.core.job.repo.JobInstanceRepo;
+import org.apache.griffin.core.job.repo.SimpleJobRepo;
 import org.apache.griffin.core.measure.entity.DataSource;
 import org.apache.griffin.core.measure.entity.GriffinMeasure;
 import org.quartz.JobDetail;
@@ -70,56 +48,56 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
+/**
+ * @CLassName SimpleJobOperatorImpl
+ * @Description Quartz Simple Job Impl
+ * @Author goodman
+ * @Date 2019-02-28 14:56
+ * @Version 1.0
+ **/
 @Service
-public class BatchJobOperatorImpl implements JobOperator {
+public class SimpleJobOperatorImpl implements JobOperator {
     private static final Logger LOGGER = LoggerFactory
-            .getLogger(BatchJobOperatorImpl.class);
+            .getLogger(SimpleJobOperatorImpl.class);
 
     @Autowired
     private SchedulerFactoryBean factory;
     @Autowired
     private JobInstanceRepo instanceRepo;
     @Autowired
-    private BatchJobRepo batchJobRepo;
+    private SimpleJobRepo simpleJobRepo;
     @Autowired
     private JobServiceImpl jobService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public AbstractJob add(AbstractJob job, GriffinMeasure measure)
-            throws Exception {
+    public AbstractJob add(AbstractJob job, GriffinMeasure measure) throws Exception {
         validateParams(job, measure);
         String qName = jobService.getQuartzName(job);
-        String qGroup = jobService.getQuartzGroup(BATCH);
+        String qGroup = jobService.getQuartzGroup(SIMPLE);
         TriggerKey triggerKey = jobService.getTriggerKeyIfValid(qName, qGroup);
-        BatchJob batchJob = genBatchJobBean(job, qName, qGroup);
-        batchJob = batchJobRepo.save(batchJob);
-        jobService.addJob(triggerKey, batchJob, BATCH);
+        SimpleJob simpleJob = genSimpleJobBean(job, qName, qGroup);
+        simpleJob = simpleJobRepo.save(simpleJob);
+        jobService.addJob(triggerKey, simpleJob, SIMPLE);
         return job;
     }
 
-    private BatchJob genBatchJobBean(AbstractJob job,
-                                     String qName,
-                                     String qGroup) {
-        BatchJob batchJob = (BatchJob) job;
-        batchJob.setMetricName(job.getJobName());
-        batchJob.setGroup(qGroup);
-        batchJob.setName(qName);
-        return batchJob;
+
+    private SimpleJob genSimpleJobBean(AbstractJob job,
+                                       String qName,
+                                       String qGroup) {
+        SimpleJob simpleJob = (SimpleJob) job;
+        simpleJob.setMetricName(job.getJobName());
+        simpleJob.setGroup(qGroup);
+        simpleJob.setName(qName);
+        return simpleJob;
     }
 
-    /**
-     * all states: BLOCKED  COMPLETE ERROR NONE  NORMAL   PAUSED
-     * to start states: PAUSED
-     * to stop states: BLOCKED   NORMAL
-     *
-     * @param job streaming job
-     */
     @Override
-    public void start(AbstractJob job) {
+    public void start(AbstractJob job) throws Exception {
         String name = job.getName();
         String group = job.getGroup();
-        TriggerState state = getTriggerState(name, group);
+        Trigger.TriggerState state = getTriggerState(name, group);
         if (state == null) {
             throw new GriffinException.BadRequestException(
                     JOB_IS_NOT_SCHEDULED);
@@ -127,7 +105,7 @@ public class BatchJobOperatorImpl implements JobOperator {
         /* If job is not in paused state,we can't start it
         as it may be RUNNING.*/
         if (state != PAUSED) {
-            throw new GriffinException .BadRequestException
+            throw new GriffinException.BadRequestException
                     (JOB_IS_NOT_IN_PAUSED_STATUS);
         }
         JobKey jobKey = jobKey(name, group);
@@ -139,38 +117,19 @@ public class BatchJobOperatorImpl implements JobOperator {
         }
     }
 
-
     @Override
-    public void one(AbstractJob job) throws SchedulerException {
-        JobKey jobKey = jobKey(job.getName(), job.getGroup());
-        JobDetail jobDetail = factory.getScheduler().getJobDetail(jobKey);
-        TriggerKey triggerKey = new TriggerKey(BATCH + "oneJob", BATCH + "oneJob");
-        Trigger trigger = genTriggerInstance(triggerKey, jobDetail);
-        factory.getScheduler().scheduleJob(trigger);
-    }
-
-    private Trigger genTriggerInstance(TriggerKey tk, JobDetail jd) {
-        return newTrigger().withIdentity(tk).forJob(jd).startNow()
-                .withSchedule(simpleSchedule().withIntervalInSeconds(1)
-                        .withRepeatCount(0))
-                .build();
-    }
-
-    @Override
-    public void stop(AbstractJob job) {
-        pauseJob((BatchJob) job, false);
+    public void stop(AbstractJob job) throws SchedulerException {
+        pauseJob((SimpleJob) job, false);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void delete(AbstractJob job) {
-        pauseJob((BatchJob) job, true);
+    public void delete(AbstractJob job) throws SchedulerException {
+        pauseJob((SimpleJob) job, true);
     }
 
-
     @Override
-    public JobHealth getHealth(JobHealth jobHealth, AbstractJob job)
-            throws SchedulerException {
+    public JobHealth getHealth(JobHealth jobHealth, AbstractJob job) throws SchedulerException {
         List<? extends Trigger> triggers = jobService
                 .getTriggers(job.getName(), job.getGroup());
         if (!CollectionUtils.isEmpty(triggers)) {
@@ -184,20 +143,37 @@ public class BatchJobOperatorImpl implements JobOperator {
     }
 
     @Override
-    public JobState getState(AbstractJob job, String action)
-            throws SchedulerException {
+    public JobState getState(AbstractJob job, String action) throws SchedulerException {
         JobState jobState = new JobState();
         Scheduler scheduler = factory.getScheduler();
         if (job.getGroup() == null || job.getName() == null) {
             return null;
         }
         TriggerKey triggerKey = triggerKey(job.getName(), job.getGroup());
-        TriggerState triggerState = scheduler.getTriggerState(triggerKey);
+        Trigger.TriggerState triggerState = scheduler.getTriggerState(triggerKey);
         jobState.setState(triggerState.toString());
         jobState.setToStart(getStartStatus(triggerState));
         jobState.setToStop(getStopStatus(triggerState));
         setTriggerTime(job, jobState);
         return jobState;
+    }
+
+
+    private Trigger.TriggerState getTriggerState(String name, String group) {
+        try {
+            List<? extends Trigger> triggers = jobService.getTriggers(name,
+                    group);
+            if (CollectionUtils.isEmpty(triggers)) {
+                return null;
+            }
+            TriggerKey key = triggers.get(0).getKey();
+            return factory.getScheduler().getTriggerState(key);
+        } catch (SchedulerException e) {
+            LOGGER.error("Failed to delete job", e);
+            throw new GriffinException
+                    .ServiceException("Failed to delete job", e);
+        }
+
     }
 
     private void setTriggerTime(AbstractJob job, JobState jobState)
@@ -218,14 +194,24 @@ public class BatchJobOperatorImpl implements JobOperator {
                 previousFireTime.getTime() : -1);
     }
 
-    /**
-     * only PAUSED state of job can be started
-     *
-     * @param state job state
-     * @return true: job can be started, false: job is running which cannot be
-     * started
-     */
-    private boolean getStartStatus(TriggerState state) {
+
+    @Override
+    public void one(AbstractJob job) throws SchedulerException {
+        JobKey jobKey = jobKey(job.getName(), job.getGroup());
+        JobDetail jobDetail = factory.getScheduler().getJobDetail(jobKey);
+        TriggerKey triggerKey = new TriggerKey(SIMPLE + "oneJob", SIMPLE + "oneJob");
+        Trigger trigger = genTriggerInstance(triggerKey, jobDetail);
+        factory.getScheduler().scheduleJob(trigger);
+    }
+
+    private Trigger genTriggerInstance(TriggerKey tk, JobDetail jd) {
+        return newTrigger().withIdentity(tk).forJob(jd).startNow()
+                .withSchedule(simpleSchedule().withIntervalInSeconds(1)
+                        .withRepeatCount(0))
+                .build();
+    }
+
+    private boolean getStartStatus(Trigger.TriggerState state) {
         return state == PAUSED;
     }
 
@@ -236,58 +222,25 @@ public class BatchJobOperatorImpl implements JobOperator {
      * @return true: job can be stopped, false: job is running which cannot be
      * stopped
      */
-    private boolean getStopStatus(TriggerState state) {
+    private boolean getStopStatus(Trigger.TriggerState state) {
         return state == NORMAL || state == BLOCKED;
     }
-
-
-    private TriggerState getTriggerState(String name, String group) {
-        try {
-            List<? extends Trigger> triggers = jobService.getTriggers(name,
-                    group);
-            if (CollectionUtils.isEmpty(triggers)) {
-                return null;
-            }
-            TriggerKey key = triggers.get(0).getKey();
-            return factory.getScheduler().getTriggerState(key);
-        } catch (SchedulerException e) {
-            LOGGER.error("Failed to delete job", e);
-            throw new GriffinException
-                    .ServiceException("Failed to delete job", e);
-        }
-
-    }
-
 
     /**
      * @param job    griffin job
      * @param delete if job needs to be deleted,set isNeedDelete true,otherwise
      *               it just will be paused.
      */
-    private void pauseJob(BatchJob job, boolean delete) {
+    private void pauseJob(SimpleJob job, boolean delete) {
         try {
             pauseJob(job.getGroup(), job.getName());
             pausePredicateJob(job);
             job.setDeleted(delete);
-            batchJobRepo.save(job);
+            simpleJobRepo.save(job);
         } catch (Exception e) {
             LOGGER.error("Job schedule happens exception.", e);
             throw new GriffinException.ServiceException("Job schedule " +
                     "happens exception.", e);
-        }
-    }
-
-    private void pausePredicateJob(BatchJob job) throws SchedulerException {
-        List<JobInstanceBean> instances = instanceRepo.findByJobId(job.getId());
-        for (JobInstanceBean instance : instances) {
-            if (!instance.isPredicateDeleted()) {
-                deleteJob(instance.getPredicateGroup(), instance
-                        .getPredicateName());
-                instance.setPredicateDeleted(true);
-                if (instance.getState().equals(LivySessionStates.State.FINDING)) {
-                    instance.setState(LivySessionStates.State.NOT_FOUND);
-                }
-            }
         }
     }
 
@@ -302,6 +255,21 @@ public class BatchJobOperatorImpl implements JobOperator {
         scheduler.deleteJob(jobKey);
 
     }
+
+    private void pausePredicateJob(SimpleJob job) throws SchedulerException {
+        List<JobInstanceBean> instances = instanceRepo.findByJobId(job.getId());
+        for (JobInstanceBean instance : instances) {
+            if (!instance.isPredicateDeleted()) {
+                deleteJob(instance.getPredicateGroup(), instance
+                        .getPredicateName());
+                instance.setPredicateDeleted(true);
+                if (instance.getState().equals(LivySessionStates.State.FINDING)) {
+                    instance.setState(LivySessionStates.State.NOT_FOUND);
+                }
+            }
+        }
+    }
+
 
     private void pauseJob(String group, String name) throws SchedulerException {
         if (StringUtils.isEmpty(group) || StringUtils.isEmpty(name)) {
@@ -318,46 +286,9 @@ public class BatchJobOperatorImpl implements JobOperator {
         scheduler.pauseJob(jobKey);
     }
 
-    public boolean pauseJobInstances(List<JobInstanceBean> instances) {
-        if (CollectionUtils.isEmpty(instances)) {
-            return true;
-        }
-        List<JobInstanceBean> deletedInstances = new ArrayList<>();
-        boolean pauseStatus = true;
-        for (JobInstanceBean instance : instances) {
-            boolean status = pauseJobInstance(instance, deletedInstances);
-            pauseStatus = pauseStatus && status;
-        }
-        instanceRepo.save(deletedInstances);
-        return pauseStatus;
-    }
-
-    private boolean pauseJobInstance(JobInstanceBean instance,
-                                     List<JobInstanceBean> deletedInstances) {
-        boolean status = true;
-        String pGroup = instance.getPredicateGroup();
-        String pName = instance.getPredicateName();
-        try {
-            if (!instance.isPredicateDeleted()) {
-                deleteJob(pGroup, pName);
-                instance.setPredicateDeleted(true);
-                deletedInstances.add(instance);
-            }
-        } catch (SchedulerException e) {
-            LOGGER.error("Failed to pause predicate job({},{}).", pGroup,
-                    pName);
-            status = false;
-        }
-        return status;
-    }
-
     private void validateParams(AbstractJob job, GriffinMeasure measure) {
         if (!jobService.isValidJobName(job.getJobName())) {
             throw new GriffinException.BadRequestException(INVALID_JOB_NAME);
-        }
-        if (!isValidCronExpression(job.getCronExpression())) {
-            throw new GriffinException.BadRequestException
-                    (INVALID_CRON_EXPRESSION);
         }
         if (!isValidBaseLine(job.getSegments())) {
             throw new GriffinException.BadRequestException
@@ -368,18 +299,6 @@ public class BatchJobOperatorImpl implements JobOperator {
             throw new GriffinException.BadRequestException
                     (INVALID_CONNECTOR_NAME);
         }
-    }
-
-    private boolean isValidCronExpression(String cronExpression) {
-        if (StringUtils.isEmpty(cronExpression)) {
-            LOGGER.warn("Cron Expression is empty.");
-            return false;
-        }
-        if (!isValidExpression(cronExpression)) {
-            LOGGER.warn("Cron Expression is invalid.");
-            return false;
-        }
-        return true;
     }
 
     private boolean isValidBaseLine(List<JobDataSegment> segments) {

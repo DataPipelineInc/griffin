@@ -19,6 +19,8 @@ under the License.
 
 package org.apache.griffin.core.login;
 
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,11 +32,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/login")
+@Api(value = "登录管理模块", tags = "登录管理模块")
 public class LoginController {
 
     @Autowired
     private LoginService loginService;
 
+    @ApiOperation(value = "登录接口")
     @RequestMapping(value = "/authenticate", method = RequestMethod.POST)
     public ResponseEntity<Map<String, Object>> login(
             @RequestBody Map<String, String> map) {

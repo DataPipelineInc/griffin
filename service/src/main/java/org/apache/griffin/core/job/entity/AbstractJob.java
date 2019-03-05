@@ -26,7 +26,6 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -46,7 +45,6 @@ import javax.persistence.PreUpdate;
 import javax.persistence.Table;
 import javax.persistence.Transient;
 import javax.validation.constraints.NotNull;
-
 import org.apache.commons.lang.StringUtils;
 import org.apache.griffin.core.measure.entity.AbstractAuditableEntity;
 import org.apache.griffin.core.util.JsonUtil;
@@ -64,7 +62,10 @@ import org.slf4j.LoggerFactory;
                 name = "streaming"),
         @JsonSubTypes.Type(
                 value = VirtualJob.class,
-                name = "virtual")})
+                name = "virtual"),
+        @JsonSubTypes.Type(
+                value = SimpleJob.class,
+                name = "simple")})
 @DiscriminatorColumn(name = "type")
 public abstract class AbstractJob extends AbstractAuditableEntity {
     private static final long serialVersionUID = 7569493377868453677L;

@@ -19,9 +19,10 @@ under the License.
 
 package org.apache.griffin.core.measure;
 
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
 import java.util.List;
 import java.util.Map;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -30,11 +31,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping(value = "/api/v1")
+@Api(value = "度量管理(组织)模块", tags = "度量管理(组织)模块")
 public class MeasureOrgController {
 
     @Autowired
     private MeasureOrgService measureOrgService;
 
+    @ApiOperation(value = "获取所有组织名字")
     @RequestMapping(value = "/org", method = RequestMethod.GET)
     public List<String> getOrgs() {
         return measureOrgService.getOrgs();
@@ -45,11 +48,14 @@ public class MeasureOrgController {
      * @return list of metric name, and a metric is the result of executing the
      * job sharing the same name with measure.
      */
+
+    @ApiOperation(value = "根据组织名字获取度量规则")
     @RequestMapping(value = "/org/{org}", method = RequestMethod.GET)
     public List<String> getMetricNameListByOrg(@PathVariable("org") String org) {
         return measureOrgService.getMetricNameListByOrg(org);
     }
 
+    @ApiOperation(value = "获取所有度量规则的名字")
     @RequestMapping(value = "/org/measure/names", method = RequestMethod.GET)
     public Map<String, List<String>> getMeasureNamesGroupByOrg() {
         return measureOrgService.getMeasureNamesGroupByOrg();
