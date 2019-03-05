@@ -78,12 +78,13 @@ public class JobController {
         return jobService.onAction(jobId, action);
     }
 
+
     @ApiOperation(value = "删除一个任务")
     @RequestMapping(value = "/jobs", method = RequestMethod.DELETE)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteJob(@RequestParam("jobName") String jobName)
             throws SchedulerException {
-        jobService.deleteJob(jobName);
+            jobService.deleteJob(jobName);
     }
 
     @ApiOperation(value = "删除一个任务")

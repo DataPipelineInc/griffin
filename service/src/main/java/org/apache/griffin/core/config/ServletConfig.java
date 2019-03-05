@@ -28,7 +28,6 @@ public class ServletConfig {
      */
     private static final int SESSION_TIMEOUT = 1;
 
-
     @Bean
     public EmbeddedServletContainerFactory servletContainer() {
         JettyEmbeddedServletContainerFactory factory = new JettyEmbeddedServletContainerFactory();
