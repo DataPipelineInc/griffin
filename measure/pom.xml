@@ -60,6 +60,8 @@ under the License.
         <sqlsercer.jdbc.version>6.2.2.jre8</sqlsercer.jdbc.version>
         <postgres.jdbc.version>42.0.0</postgres.jdbc.version>
 
+        <nexus.ip>registry.datapipeline.com</nexus.ip>
+
     </properties>
 
     <repositories>
@@ -317,4 +319,15 @@ under the License.
             </plugin>
         </plugins>
     </build>
+    <distributionManagement>
+        <repository>
+            <id>datapipeline</id>
+            <name>dp snapshot</name>
+            <url>http://${nexus.ip}:8081/nexus/content/repositories/snapshots</url>
+        </repository>
+        <snapshotRepository>
+            <id>datapipeline</id>
+            <url>http://${nexus.ip}:8081/nexus/content/repositories/snapshots</url>
+        </snapshotRepository>
+    </distributionManagement>
 </project>

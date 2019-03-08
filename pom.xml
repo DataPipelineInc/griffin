@@ -47,6 +47,7 @@ under the License.
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
+        <nexus.ip>registry.datapipeline.com</nexus.ip>
     </properties>
 
     <licenses>
@@ -85,12 +86,9 @@ under the License.
         <tag>HEAD</tag>
     </scm>
 
-    <distributionManagement>
-    </distributionManagement>
-
 
     <modules>
-        <module>ui</module>
+        <!--<module>ui</module>-->
         <module>service</module>
         <module>measure</module>
     </modules>
@@ -199,5 +197,15 @@ under the License.
             </plugin>
         </plugins>
     </build>
-
+    <distributionManagement>
+        <repository>
+            <id>datapipeline</id>
+            <name>dp snapshot</name>
+            <url>http://${nexus.ip}:8081/nexus/content/repositories/snapshots</url>
+        </repository>
+        <snapshotRepository>
+            <id>datapipeline</id>
+            <url>http://${nexus.ip}:8081/nexus/content/repositories/snapshots</url>
+        </snapshotRepository>
+    </distributionManagement>
 </project>

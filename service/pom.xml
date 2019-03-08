@@ -49,6 +49,7 @@ under the License.
         <eclipselink.version>2.6.0</eclipselink.version>
         <mysql.java.version>5.1.47</mysql.java.version>
         <postgresql.version>9.4.1212.jre7</postgresql.version>
+        <nexus.ip>registry.datapipeline.com</nexus.ip>
     </properties>
 
     <repositories>
@@ -315,4 +316,15 @@ under the License.
             </plugin>
         </plugins>
     </build>
+    <distributionManagement>
+        <repository>
+            <id>datapipeline</id>
+            <name>dp snapshot</name>
+            <url>http://${nexus.ip}:8081/nexus/content/repositories/snapshots</url>
+        </repository>
+        <snapshotRepository>
+            <id>datapipeline</id>
+            <url>http://${nexus.ip}:8081/nexus/content/repositories/snapshots</url>
+        </snapshotRepository>
+    </distributionManagement>
 </project>
